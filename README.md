@@ -283,6 +283,8 @@ connection.connect(err => {
 ```
 
 ### Rutas y controladores 
+
+#### Gets
 Vamos a crear una ruta para mostrar todas las personas de la base de datos y que lo devuelva en JSON, vamos a crear la ruta "/verPersonas":
 
 ```
@@ -307,3 +309,139 @@ app.listen(port, () => {
 ```
 Entonces si iniciarmos con ```npm start``` y en el navegador buscamos ```http://localhost:3000/verPersonas``` y obtendremos todas las personas de nuestra tabla personas en JSON
 
+
+Obtener una persona por id
+
+```
+// La URL será: http://localhost:3000/1/verUnUsuario
+app.get('/:id/verUnUsuario', (req, res) => {
+  // Capturamos el ID desde la URL
+  const userId = req.params.id;
+
+  const sql = 'SELECT * FROM personas WHERE id = ?';
+  
+  // Pasamos el userId como segundo parámetro para evitar inyecciones SQL
+  connection.query(sql, [userId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    }
+
+    // Devolvemos solo el primer resultado (el objeto, no el array)
+    res.json(results[0]);
+  });
+});
+```
+
+
+#### Delete
+Eliminamos una persona por ID
+
+```
+// La URL será: http://localhost:3000/eliminar/1
+//Usamos delete porque vamos a eliminar una persona
+
+app.delete('/eliminar/:id', (req, res) => {
+  const userId = req.params.id;
+  const sql = 'DELETE FROM personas WHERE id = ?';
+
+  connection.query(sql, [userId], (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    // result.affectedRows nos dice cuántas filas se borraron
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ mensaje: "No se encontró el usuario para eliminar" });
+    }
+
+    res.json({ mensaje: `Usuario con ID ${userId} eliminado correctamente` });
+  });
+});
+```
+
+
+#### Post 
+Para ello necesitaremos escribir ```app.use(express.json());``` bajo ```const app = express();```  Esto permite que Express lea JSON en el body
+
+Vamos a crear una persona
+
+```
+// Usamos POST porque estamos enviando información nueva
+app.post('/crearPersona', (req, res) => {
+  // Extraemos nombre y edad del body de la petición
+  const { nombre, edad } = req.body;
+
+  // Verificación básica
+  if (!nombre || !edad) {
+    return res.status(400).json({ error: "Faltan datos (nombre o edad)" });
+  }
+
+  const sql = 'INSERT INTO personas (nombre, edad) VALUES (?, ?)';
+  
+  connection.query(sql, [nombre, edad], (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    res.status(201).json({
+      mensaje: "Persona creada con éxito",
+      id: result.insertId,
+      datos: { nombre, edad }
+    });
+  });
+});
+```
+
+
+#### Put
+Para actualizar a una persona, este ejemplo está hecho de forma si queremos solo cambiar un rejistro, por ejemplo, cambiar la edad de la persona pero mantener su nombre, para ello usaremos condicionales if
+
+```
+// URL: http://localhost:3000/actualizarPersona/1
+app.put('/actualizarPersona/:id', (req, res) => {
+  const userId = req.params.id;
+  const { nombre, edad } = req.body;
+
+  // 1. Verificamos que al menos venga un dato para actualizar
+  if (!nombre && !edad) {
+    return res.status(400).json({ error: "Debes enviar al menos un campo (nombre o edad) para actualizar" });
+  }
+
+  // 2. Construcción dinámica de la consulta
+  let campos = [];
+  let valores = [];
+
+  if (nombre) {
+    campos.push("nombre = ?");
+    valores.push(nombre);
+  }
+
+  if (edad) {
+    campos.push("edad = ?");
+    valores.push(edad);
+  }
+
+  // Agregamos el ID al final del array de valores para el WHERE
+  valores.push(userId);
+
+  // La magia: Unimos los campos con comas
+  // Resultado final será algo como: "UPDATE personas SET nombre = ?, edad = ? WHERE id = ?"
+  const sql = `UPDATE personas SET ${campos.join(", ")} WHERE id = ?`;
+
+  connection.query(sql, valores, (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    }
+
+    res.json({ mensaje: "Usuario actualizado correctamente" });
+  });
+});
+```
