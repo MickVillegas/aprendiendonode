@@ -1,6 +1,8 @@
 const express = require('express');
+const cors = require('cors');
 const mysql = require('mysql2');
 const app = express();
+app.use(cors());
 app.use(express.json()); // Esto permite que Express lea JSON en el body
 const port = 3000;
 
@@ -161,4 +163,8 @@ app.get('/', (req, res) => {
 // 4. Iniciar el servidor
 app.listen(port, () => {
   console.log(`Servidor corriendo en http://localhost:${port}`);
+});
+
+app.listen(3000, () => {
+    console.log("Servidor corriendo en http://localhost:3000");
 });
